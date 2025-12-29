@@ -24,6 +24,8 @@ export interface Filters {
   over200: boolean;
   rating4Plus: boolean;
   rating3Plus: boolean;
+  rating2Plus: boolean;
+  rating1Plus: boolean;
 }
 
 export interface FilterCheckboxProps {

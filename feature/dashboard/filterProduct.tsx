@@ -1,15 +1,16 @@
 "use client"
 
 import React, { useState, useEffect, useMemo } from "react";
-import { Star, ShoppingCart } from "lucide-react";
+import { Star, ShoppingCart, Heart } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { FilterCheckboxProps, Filters, Product,ProductCardProps,Rating } from "./types/products";
-
-
+import { FilterCheckboxProps, Filters, Product, ProductCardProps } from "./types/products";
+import { useCartStore } from "@/store/cartStore";
+import { useWishlistStore } from "@/store/wishlist.store";
+import { toast } from "sonner";
 
 export default function ProductListingPage(): React.ReactElement {
   const [products, setProducts] = useState<Product[]>([]);
@@ -25,24 +26,15 @@ export default function ProductListingPage(): React.ReactElement {
     over200: false,
     rating4Plus: false,
     rating3Plus: false,
+    rating2Plus: false,
+    rating1Plus: false,
   });
 
-  // Fetch products from Fake Store API
   useEffect(() => {
     const fetchProducts = async () => {
-      try {
         const response = await fetch("https://fakestoreapi.com/products");
-        
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
         const data: Product[] = await response.json();
         setProducts(data);
-      } catch (err) {
-        console.error("Error fetching products:", err);
-      } finally {
-      }
     };
 
     fetchProducts();
@@ -75,7 +67,6 @@ export default function ProductListingPage(): React.ReactElement {
         if (!matchesCategory) return false;
       }
 
-      // Price filters
       const priceFilters = [
         filters.under50,
         filters.fiftyTo100,
@@ -96,6 +87,8 @@ export default function ProductListingPage(): React.ReactElement {
 
       if (filters.rating4Plus && product.rating.rate < 4) return false;
       if (filters.rating3Plus && product.rating.rate < 3) return false;
+      if (filters.rating2Plus && product.rating.rate < 2) return false;
+      if (filters.rating1Plus && product.rating.rate < 1) return false;
 
       return true;
     });
@@ -113,19 +106,20 @@ export default function ProductListingPage(): React.ReactElement {
       over200: false,
       rating4Plus: false,
       rating3Plus: false,
+      rating2Plus: false,
+      rating1Plus: false,
     });
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
-
       <div className="max-w-7xl mx-auto flex gap-6 p-6">
         <div className="w-64">
             <div className="bg-white rounded-lg p-4 shadow-sm">
-              <h3 className="font-semibold mb-4">Filters</h3>
+              <h3 className="font-semibold mb-4 text-gray-900">Filters</h3>
 
-              <h4 className="font-semibold mb-3 text-sm">Category</h4>
-              <div className="space-y-3 mb-6">
+              <h4 className="font-semibold mb-3 text-sm text-gray-900">Category</h4>
+              <div className="space-y-3 mb-6 text-gray-900">
                 <FilterCheckbox
                   id="electronics"
                   label="Electronics"
@@ -152,8 +146,8 @@ export default function ProductListingPage(): React.ReactElement {
                 />
               </div>
 
-              <h4 className="font-semibold mb-3 text-sm">Price Range</h4>
-              <div className="space-y-3 mb-6">
+              <h4 className="font-semibold mb-3 text-sm text-gray-900">Price Range</h4>
+              <div className="space-y-3 mb-6 text-gray-900">
                 <FilterCheckbox
                   id="under50"
                   label="Under $50"
@@ -180,8 +174,8 @@ export default function ProductListingPage(): React.ReactElement {
                 />
               </div>
 
-              <h4 className="font-semibold mb-3 text-sm">Rating</h4>
-              <div className="space-y-3 mb-6">
+              <h4 className="font-semibold mb-3 text-sm text-gray-900">Rating</h4>
+              <div className="space-y-3 mb-6 text-gray-900">
                 <FilterCheckbox
                   id="rating4Plus"
                   label="4+ Stars"
@@ -193,6 +187,18 @@ export default function ProductListingPage(): React.ReactElement {
                   label="3+ Stars"
                   checked={filters.rating3Plus}
                   onChange={() => handleFilterChange("rating3Plus")}
+                />
+                 <FilterCheckbox
+                  id="rating4Plus"
+                  label="2+ Stars"
+                  checked={filters.rating2Plus}
+                  onChange={() => handleFilterChange("rating2Plus")}
+                />
+                <FilterCheckbox
+                  id="rating1Plus"
+                  label="1+ Stars"
+                  checked={filters.rating1Plus}
+                  onChange={() => handleFilterChange("rating1Plus")}
                 />
               </div>
 
@@ -223,7 +229,7 @@ export default function ProductListingPage(): React.ReactElement {
       </div>
     </div>
   );
-};
+}
 
 const FilterCheckbox: React.FC<FilterCheckboxProps> = ({ id, label, checked, onChange }): React.ReactElement => {
   return (
@@ -236,24 +242,79 @@ const FilterCheckbox: React.FC<FilterCheckboxProps> = ({ id, label, checked, onC
   );
 };
 
-
 const ProductCard: React.FC<ProductCardProps> = ({ product }): React.ReactElement => {
+  const addItem = useCartStore((state) => state.addItem);
+  const wishlistItems = useWishlistStore((state) => state.items);
+  const addToWishlist = useWishlistStore((state) => state.addItem);
+  const removeFromWishlist = useWishlistStore((state) => state.removeItem);
+  
+  const [isAdding, setIsAdding] = useState(false);
+  
+  // Check if product is in wishlist
+  const isInWishlist = wishlistItems.some((item) => item.id === product.id.toString());
+
+  const handleAddToCart = () => {
+    setIsAdding(true);
+    
+    addItem({
+      id: product.id.toString(),
+      name: product.title,
+      price: product.price,
+      image: product.image,
+      category: product.category,
+    });
+
+    setTimeout(() => {
+      setIsAdding(false);
+      toast.success("Added to cart!");
+    }, 300);
+  };
+
+  const handleToggleWishlist = () => {
+    if (isInWishlist) {
+      // Remove from wishlist
+      removeFromWishlist(product.id.toString());
+      toast.success("Removed from wishlist");
+    } else {
+      // Add to wishlist with quantity 1
+      addToWishlist({
+        id: product.id.toString(),
+        name: product.title,
+        price: product.price,
+        quantity: 1,
+        image: product.image,
+        category: product.category,
+      });
+      toast.success("Added to wishlist!");
+    }
+  };
+
   return (
-    <Card className="hover:shadow-lg transition-shadow rounded-lg overflow-hidden h-full flex flex-col">
+    <Card className="hover:shadow-lg transition-shadow rounded-lg overflow-hidden h-full flex flex-col relative">
       <div className="p-4 bg-gray-50 flex items-center justify-center h-48">
         <img
           src={product.image}
           className="max-h-full max-w-full object-contain"
           alt={product.title}
         />
+        <button 
+          onClick={handleToggleWishlist}
+          className="absolute top-2 right-2 p-2 bg-white rounded-full hover:bg-gray-100 transition shadow-sm"
+        > 
+          <Heart 
+            className={`w-5 h-5 transition-colors ${
+              isInWishlist ? "fill-red-500 text-red-500" : "text-gray-700"
+            }`}
+          />
+        </button>
       </div>
       
       <CardContent className="p-4 flex-1 flex flex-col">
-        <Badge variant="secondary" className="text-xs mb-2 w-fit">
+        <Badge variant="secondary" className="text-xs mb-2 w-fit text-gray-600">
           {product.category}
         </Badge>
         
-        <h3 className="text-sm font-semibold mb-2 line-clamp-2 hover:text-blue-600 cursor-pointer">
+        <h3 className="text-sm font-semibold mb-2 line-clamp-2 text-gray-900 hover:text-blue-600 cursor-pointer">
           {product.title}
         </h3>
 
@@ -285,9 +346,13 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }): React.ReactElemen
       </CardContent>
 
       <CardFooter className="px-4 pb-4 pt-0">
-        <Button className="w-full flex items-center gap-2 justify-center">
+        <Button 
+          className="w-full flex items-center gap-2 justify-center bg-gray-900"
+          onClick={handleAddToCart}
+          disabled={isAdding}
+        >
           <ShoppingCart className="w-4 h-4" />
-          Add to Cart
+          {isAdding ? "Adding..." : "Add to Cart"}
         </Button>
       </CardFooter>
     </Card>
